@@ -1,25 +1,30 @@
-# importaciones
+#importaciones
 from fastapi import FastAPI, status, HTTPException, Depends
 import asyncio
 from typing import Optional
 from pydantic import BaseModel, Field
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-import secrets
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from datetime import datetime, timedelta, timezone
+from jose import JWTError, jwt
 
-# Inicializacion o Instacia de la API
-app = FastAPI(
+#Inicializacion o Instacia de la API
+app= FastAPI(
     title= 'Mi primer API',
-    description='Diego Rubio Guerrero',
+    description='Diego Rubio guerrero',
     version='1,0'
 )
 
-# BD Ficticia
-
-usuarios = [
-    {"id": 1 ,"nombre":"martin","edad":21},
-    {"id":2,"nombre":"jack","edad":23},
-    {"id":3,"nombre":"tovar","edad":20},
+#BD Ficticia
+usuarios=[
+    {"id":1,"nombre":"tovar","edad":21},
+    {"id":2,"nombre":"andres","edad":25},
+    {"id":3,"nombre":"bomba", "edad":28},
 ]
+
+#Configuracion JWT
+CLAVE_PRIVADA = "mi_clave_secreta"
+TIPO_ALGORITMO = "HS256"
+TIEMPO_EXPIRACION = 30
 
 
 #Modelo de Validacion Pydantic
@@ -28,34 +33,36 @@ class UsuarioBase(BaseModel):
     nombre: str = Field(...,min_length=3,max_length=50,description="Nombre del usuario")
     edad: int = Field(...,ge=0,le=121,description="Edad valida entre 0 y 121")
 
-#****************************************************
-#Seguridad con HTTP Basic
-#****************************************************
-security = HTTPBasic()
+#Configuracion OAuth2 y funcion
 
-def verificar_Peticion(credentials:HTTPBasicCredentials=Depends(security)):
-    usuarioAuth = secrets.compare_digest(credentials.username,"RUBIO")
-    contraAuth = secrets.compare_digest(credentials.password,"2345678")
-    
-    if not (usuarioAuth and contraAuth):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Credenciales no validas"
-        )
-        
-        for index, usr in enumerate(usuarios):
-            if usr["id"] == id:
-                usuarios.pop(index)
-                return {
-                    "mensaje": f"Usuario eliminado correctamente por {credentials.username}",
-                    "datos": usr
-                }
-        
-    return credentials.username
+esquema_oauth = OAuth2PasswordBearer(tokenUrl="token")
+
+def crear_token_acceso(datos: dict):
+    datos_copia = datos.copy()
+    tiempo_limite = datetime.now(timezone.utc) + timedelta(minutes=TIEMPO_EXPIRACION)
+    datos_copia.update({"exp": tiempo_limite})
+    token_generado = jwt.encode(datos_copia, CLAVE_PRIVADA, algorithm=TIPO_ALGORITMO)
+    return token_generado
+
+#Funcion para validar el token
+async def validar_token(token: str = Depends(esquema_oauth)):
+    try:
+        datos_decodificados = jwt.decode(token, CLAVE_PRIVADA, algorithms=[TIPO_ALGORITMO])
+        nombre_usuario = datos_decodificados.get("sub")
+
+        if nombre_usuario is None:
+            raise HTTPException(status_code=401, detail="Token inválido")
+
+        return nombre_usuario
+
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
+
+
 #Endpoints
 @app.get("/",tags=['Inicio'])
 async def comoandamosrasa():
-    return {"mensaje":"Hola mundo FastAPI"}
+    return {"mensaje":"Hola mundo FastAPI"}   
 
 @app.get("/v1/bienvenidos", tags=['Inicio'])
 async def bienvenido():
@@ -115,12 +122,16 @@ async def agregar_usuarios(usuario:UsuarioBase):
         "status":"200"
     }
 
-
 @app.put("/v1/usuarios/{id}", tags=['CRUD Usuarios'])
-async def actualizar_usuarios(id: int, usuario_actualizado: dict):
+async def actualizar_usuarios(id: int, usuario_actualizado: dict, usuario_actual: str = Depends(validar_token)):
+
     for index, usr in enumerate(usuarios):
         if usr["id"] == id:
+
+            usuario_actualizado["id"] = id  # mantener el id
+
             usuarios[index] = usuario_actualizado
+
             return {
                 "mensaje": "Usuario actualizado correctamente",
                 "datos": usuario_actualizado
@@ -132,16 +143,37 @@ async def actualizar_usuarios(id: int, usuario_actualizado: dict):
     )
 
 @app.delete("/v1/usuarios/{id}", tags=['CRUD Usuarios'])
-async def eliminar_usuario(id: int, usuarioAuth:str= Depends(verificar_Peticion)):
+async def eliminar_usuario(
+    id: int,
+    usuario_actual: str = Depends(validar_token)
+):
     for usr in usuarios:
         if usr["id"] == id:
-            usuarios.pop(usr)
+            usuarios.remove(usr)
             return {
                 "mensaje": "Usuario eliminado correctamente",
-                "datos": usr
+                "realizado_por": usuario_actual
             }
-    
+
     raise HTTPException(
         status_code=404,
-        detail="El Usuario no existe"
+        detail="El usuario no existe"
     )
+
+
+# creamos el Nuevo endpoint para usar la autenticacion
+@app.post("/token")
+async def iniciar_sesion(datos_formulario: OAuth2PasswordRequestForm = Depends()):
+    
+    if datos_formulario.username != "Diego" or datos_formulario.password != "HS256":
+        raise HTTPException(
+            status_code=400,
+            detail="Credenciales incorrectas"
+        )
+
+    token = crear_token_acceso({"sub": datos_formulario.username})
+
+    return {
+        "access_token": token,
+        "token_type": "bearer"
+    }
