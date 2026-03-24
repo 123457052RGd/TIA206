@@ -4,13 +4,13 @@ from typing import Optional
 from app.data.database import usuarios
 
 router = APIRouter(
-    prefix="/misc",   # 👈 importante para evitar conflictos de rutas
+    prefix="/misc",   #
     tags=["Varios"]
 )
 
 # Endpoint base
 @router.get("/")
-async def como_andamos_rasa():
+async def root():
     return {"mensaje": "Hola mundo FastAPI"}
 
 # Endpoint simple
@@ -21,7 +21,7 @@ async def bienvenido():
 # Simulación de proceso lento
 @router.get("/v1/calificaciones")
 async def calificaciones():
-    await asyncio.sleep(2)  # 👈 6 segundos es excesivo para pruebas
+    await asyncio.sleep(2)  #
     return {"mensaje": "Tu calificación en TAI es 10"}
 
 # Parámetro obligatorio

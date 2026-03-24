@@ -1,6 +1,12 @@
 # importaciones
 from fastapi import FastAPI
 from app.routers import usuarios, misc
+from app.data.bd import engine
+from app.data import usuario
+
+
+usario.Base.metadato.create_all(bind=engine)
+
 
 # Inicialización de la API
 app = FastAPI(
@@ -19,5 +25,7 @@ def root():
     return {"mensaje": "API funcionando correctamente"}
 
 
+v
 
-    
+
+

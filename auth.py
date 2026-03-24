@@ -6,8 +6,8 @@ from fastapi import status, HTTPException, Depends
 security = HTTPBasic()
 
 def verificar_Peticion(credentials:HTTPBasicCredentials=Depends(security)):
-    usuarioAuth = secrets.compare_digest(credentials.username,"martingd")
-    contraAuth = secrets.compare_digest(credentials.password,"1234")
+    usuarioAuth = secrets.compare_digest(credentials.username,"diego")
+    contraAuth = secrets.compare_digest(credentials.password,"456789")
     
     if not (usuarioAuth and contraAuth):
         raise HTTPException(
